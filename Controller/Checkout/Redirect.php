@@ -36,16 +36,19 @@ class Redirect extends \Magento\Checkout\Controller\Onepage
 
         // Get quote
         $quote = $this->getOnepage()->getQuote();
-        $quote->reserveOrderId()->setIsActive(0)->save();
 
-        $reservedOrderId = $quote->getReservedOrderId();
-        $quoteId = $quote->getId();
+        if ($quote->getId()) {
+            $quote->reserveOrderId()->setIsActive(0)->save();
 
-        $session->setLastQuoteId($quoteId)
-            ->setLastSuccessQuoteId($quoteId)
-            ->clearHelperData();
+            $reservedOrderId = $quote->getReservedOrderId();
+            $quoteId = $quote->getId();
 
-        $session->setLastRealOrderId($reservedOrderId);
+            $session->setLastQuoteId($quoteId)
+                ->setLastSuccessQuoteId($quoteId)
+                ->clearHelperData();
+
+            $session->setLastRealOrderId($reservedOrderId);
+        }
 
         $resultPage = $this->resultPageFactory->create();
 
