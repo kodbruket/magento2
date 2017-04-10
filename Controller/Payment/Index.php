@@ -24,6 +24,8 @@ use Mondido\Mondido\Helper\Data;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Email\Sender\OrderSender;
 use Magento\Newsletter\Model\Subscriber;
+use Magento\Framework\Mail\Template\TransportBuilder;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 
 /**
  * Payment action
@@ -98,8 +100,10 @@ class Index extends \Magento\Framework\App\Action\Action
      * @param \Mondido\Mondido\Api\Transaction                    $transaction       Transaction API model
      * @param \Mondido\Mondido\Helper\Data                        $helper            Data helper
      * @param \Magento\Sales\Model\Order                          $order             Order model
-     * @param \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender       Order seder
+     * @param \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender       Order sender
      * @param \Magento\Newsletter\Model\Subscriber                $subscriber        Subscriber model
+     * @param \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender       Order sender
+     * @param \Magento\Framework\Mail\Template\TransportBuilder   $transportBuilder  Transport builder
      *
      * @return void
      */
@@ -114,7 +118,9 @@ class Index extends \Magento\Framework\App\Action\Action
         Data $helper,
         Order $order,
         OrderSender $orderSender,
-        Subscriber $subscriber
+        Subscriber $subscriber,
+        TransportBuilder $transportBuilder,
+        ScopeConfigInterface $scopeConfig
     ) {
         parent::__construct($context);
 
@@ -128,6 +134,8 @@ class Index extends \Magento\Framework\App\Action\Action
         $this->order = $order;
         $this->orderSender = $orderSender;
         $this->subscriber = $subscriber;
+        $this->transportBuilder = $transportBuilder;
+        $this->scopeConfig = $scopeConfig;
     }
 
     /**
@@ -160,6 +168,25 @@ class Index extends \Magento\Framework\App\Action\Action
                     $order = false;
                     $result['error'] = 'Quote is still active in Magento, please try again in a while.';
                     $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_INTERNAL_ERROR);
+
+                    $body = [];
+                    $body['notice'] = sprintf("Quote %s is still active in Magento, order could not be created from the Mondido webhook.", $quote->getId());
+
+                    $transport = $this->_transportBuilder
+                        ->setTemplateIdentifier('mondido_payment_webhook_notice')
+                        ->setTemplateOptions(
+                            [
+                                'area' => \Magento\Framework\App\Area::AREA_FRONTEND, 
+                                'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
+                            ]
+                        )
+                        ->setTemplateVars(['data' => $body])
+                        ->setFrom($this->scopeConfig->getValue('trans_email/ident_support/general', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                        ->addTo($this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                        ->getTransport();
+
+                    $transport->sendMessage();
+
                 } else if ($data['amount'] !== $this->helper->formatNumber($quote->getBaseGrandTotal())) {
                     $order = false;
                     $result['error'] = 'Wrong amount';
@@ -224,6 +251,25 @@ class Index extends \Magento\Framework\App\Action\Action
                         $this->logger->debug($e);
                         $result['error'] = $e->getMessage();
                         $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_BAD_REQUEST);
+
+                        $body = [];
+                        $body['notice'] = sprintf("Quote %s could not be converted to an order: %s. Please make sure the Mondido transaction %s contains valid order information.", $quoteId, $e->getMessage(), $data['id']);
+
+                        $transport = $this->_transportBuilder
+                            ->setTemplateIdentifier('mondido_payment_webhook_notice')
+                            ->setTemplateOptions(
+                                [
+                                    'area' => \Magento\Framework\App\Area::AREA_FRONTEND, 
+                                    'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
+                                ]
+                            )
+                            ->setTemplateVars(['data' => $body])
+                            ->setFrom($this->scopeConfig->getValue('trans_email/ident_support/general', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                            ->addTo($this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                            ->getTransport();
+
+                        $transport->sendMessage();
+
                     }
                 }
             }
