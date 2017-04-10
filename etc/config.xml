@@ -13,7 +13,16 @@
                 <model>Mondido\Mondido\Model\HostedWindow</model>
                 <allowspecific>0</allowspecific>
                 <title>Mondido Hosted Window</title>
+                <can_use_internal>0</can_use_internal>
             </mondido_hostedwindow>
+            <mondido_paymentlink>
+                <active>0</active>
+                <model>Mondido\Mondido\Model\Paymentlink</model>
+                <payment_action>authorize</payment_action>
+                <order_status>pending</order_status>
+                <title>Mondido Payment Link</title>
+                <allowspecific>0</allowspecific>
+            </mondido_paymentlink>
         </payment>
     </default>
 </config>

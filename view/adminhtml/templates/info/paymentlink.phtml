@@ -1,0 +1,14 @@
+<?php
+/**
+ * @var \Magento\Payment\Block\Info $block
+ * @see \Magento\Payment\Block\Info
+ */
+?>
+<?php echo $block->escapeHtml($block->getMethod()->getTitle()); ?>
+<?php if ($this->getPaymentLink()): ?>
+<p>
+    <a href="<?php echo $this->getPaymentLink(); ?>"><?php echo __('Click here to pay your order'); ?></a>
+</p>
+<?php endif; ?>
+
+<?php echo $block->getChildHtml()?>

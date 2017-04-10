@@ -10,6 +10,9 @@
         <method name="mondido_hostedwindow">
             <allow_multiple_address>0</allow_multiple_address>
         </method>
+        <method name="mondido_paymentlink">
+            <allow_multiple_address>0</allow_multiple_address>
+        </method>
     </methods>
 </payment>
 

@@ -1,0 +1,43 @@
+<?php
+/**
+ * Mondido
+ *
+ * PHP version 5.6
+ *
+ * @category Mondido
+ * @package  Mondido_Mondido
+ * @author   Andreas Karlsson <andreas@kodbruket.se>
+ * @license  MIT License https://opensource.org/licenses/MIT
+ * @link     https://www.mondido.com
+ */
+
+namespace Mondido\Mondido\Controller\Paymentlink;
+
+/**
+ * Error action
+ *
+ * @category Mondido
+ * @package  Mondido_Mondido
+ * @author   Robert Lord <robert@codepeak.se>
+ * @license  MIT License https://opensource.org/licenses/MIT
+ * @link     https://www.mondido.com
+ */
+class Error extends \Mondido\Mondido\Controller\Checkout\Index
+{
+    /**
+     * Execute
+     *
+     * @return @void
+     */
+    public function execute()
+    {
+        die('error');
+
+        $message = $this->getRequest()->getParam('error_name');
+        $this->messageManager->addError(__($message));
+
+        $resultPage = $this->resultPageFactory->create();
+
+        return $resultPage;
+    }
+}

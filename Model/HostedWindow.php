@@ -79,6 +79,11 @@ class HostedWindow extends \Magento\Payment\Model\Method\AbstractMethod
     protected $_canUseCheckout = true;
 
     /**
+     * @var bool
+     */
+    protected $_canUseInternal = false;
+
+    /**
      * Mondido API wrapper for transactions
      *
      * @var \Mondido\Mondido\Model\Api\Transaction

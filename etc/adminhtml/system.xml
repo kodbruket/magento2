@@ -3,36 +3,25 @@
     <system>
         <section id="payment">
             <group id="mondido" translate="label comment" sortOrder="900" showInDefault="1" showInWebsite="1" showInStore="1">
-
                 <label><![CDATA[Mondido&nbsp;&nbsp;<i>We help you convert more visitors into paying customers.</i>]]></label>
                 <comment><![CDATA[Through our conversion optimization tools that are tailored for online merchants we will help you to create the best payment experience for your clients for every platform.]]></comment>
-
                 <attribute type="expanded">1</attribute>
-
                 <fieldset_css>complex</fieldset_css>
-
                 <frontend_model>Mondido\Mondido\Block\Adminhtml\System\Config\Fieldset\Group</frontend_model>
-
                 <group id="mondido_script" translate="label" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
                     <frontend_model>Mondido\Mondido\Block\Adminhtml\System\Config\Fieldset\Script</frontend_model>
                 </group>
-
                 <group id="mondido_hostedwindow" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1" translate="label comment">
                     <label><![CDATA[Hosted Window]]></label>
                     <comment><![CDATA[Mondido’s Hosted Window solution allows you to create a payment page with the desired look-and-feel to go with the rest of the site. The Hosted Window is responsive so that it works for both mobile and iPad (you can use jQuery or Bootstrap) and if you want to A/B-test different design ideas, you can easily find out which one generates the most purchases.]]></comment>
-
                     <frontend_model>Mondido\Mondido\Block\Adminhtml\System\Config\Fieldset\Payment</frontend_model>
-
                     <fieldset_css>mondido-method-hostedwindow</fieldset_css>
-
                     <attribute type="activity_path">payment/mondido/active</attribute>
-
                     <group id="mondido_required" translate="label" showInDefault="1" showInWebsite="1" sortOrder="5">
                         <label>Basic Settings</label>
                         <comment><![CDATA[<a href="https://www.mondido.com/en/signup" target="_blank">Click here to login to your existing Mondido account</a>. To setup a new account and accept payments on your website, <a href="https://www.mondido.com/en/" target="_blank">click here to signup for an account</a>.]]></comment>
                         <attribute type="expanded">1</attribute>
                         <frontend_model>Magento\Config\Block\System\Config\Form\Fieldset</frontend_model>
-
                         <field id="active" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                             <label>Enable this Solution</label>
                             <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
@@ -65,6 +54,23 @@
                         </field>
                     </group>
                 </group>
+            </group>
+            <group id="mondido_paymentlink" showInDefault="1" showInStore="1" showInWebsite="1" sortOrder="10" translate="label">
+                <label>Mondido Payment Link</label>
+                <field id="active" showInDefault="1" showInStore="1" showInWebsite="1" sortOrder="10" translate="label" type="select">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="title" showInDefault="1" showInStore="1" showInWebsite="1" sortOrder="20" translate="label" type="text">
+                    <label>Title</label>
+                </field>
+                <field id="order_status" showInDefault="1" showInStore="1" showInWebsite="1" sortOrder="30" translate="label" type="select">
+                    <label>New Order Status</label>
+                    <source_model>Magento\Sales\Model\Config\Source\Order\Status\NewStatus</source_model>
+                </field>
+                <field id="sort_order" showInDefault="1" showInStore="1" showInWebsite="1" sortOrder="60" translate="label" type="text">
+                    <label>Sort Order</label>
+                </field>
             </group>
         </section>
     </system>
