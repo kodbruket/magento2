@@ -169,23 +169,30 @@ class Index extends \Magento\Framework\App\Action\Action
                     $result['error'] = 'Quote is still active in Magento, please try again in a while.';
                     $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_INTERNAL_ERROR);
 
-                    $body = [];
-                    $body['notice'] = sprintf("Quote %s is still active in Magento, order could not be created from the Mondido webhook.", $quote->getId());
+                    $now = new \DateTime(NOW)->getTimestamp();
+                    $quoteUpdatedAt = new \DateTime($quote->getUpdatedAt())->getTimestamp();
 
-                    $transport = $this->_transportBuilder
-                        ->setTemplateIdentifier('mondido_payment_webhook_notice')
-                        ->setTemplateOptions(
-                            [
-                                'area' => \Magento\Framework\App\Area::AREA_FRONTEND, 
-                                'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
-                            ]
-                        )
-                        ->setTemplateVars(['data' => $body])
-                        ->setFrom($this->scopeConfig->getValue('trans_email/ident_support/general', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
-                        ->addTo($this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
-                        ->getTransport();
+                    $interval = $quoteUpdatedAt->diff($now, true);
 
-                    $transport->sendMessage();
+                    if ($now - $quoteUpdatedAt > 300) {
+                        $body = [];
+                        $body['notice'] = sprintf("Quote %s is still active in Magento, order could not be created from the Mondido webhook.", $quote->getId());
+
+                        $transport = $this->_transportBuilder
+                            ->setTemplateIdentifier('mondido_payment_webhook_notice')
+                            ->setTemplateOptions(
+                                [
+                                    'area' => \Magento\Framework\App\Area::AREA_FRONTEND, 
+                                    'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
+                                ]
+                            )
+                            ->setTemplateVars(['data' => $body])
+                            ->setFrom($this->scopeConfig->getValue('trans_email/ident_support/general', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                            ->addTo($this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                            ->getTransport();
+
+                        $transport->sendMessage();
+                    }
 
                 } else if ($data['amount'] !== $this->helper->formatNumber($quote->getBaseGrandTotal())) {
                     $order = false;
