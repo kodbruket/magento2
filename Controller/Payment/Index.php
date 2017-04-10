@@ -146,6 +146,7 @@ class Index extends \Magento\Framework\App\Action\Action
     public function execute()
     {
         $data = $this->getRequest()->getPostValue();
+
         $this->logger->debug(var_export($data, true));
 
         $result = [];
@@ -169,35 +170,70 @@ class Index extends \Magento\Framework\App\Action\Action
                     $result['error'] = 'Quote is still active in Magento, please try again in a while.';
                     $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_INTERNAL_ERROR);
 
-                    $now = new \DateTime(NOW)->getTimestamp();
-                    $quoteUpdatedAt = new \DateTime($quote->getUpdatedAt())->getTimestamp();
 
-                    $interval = $quoteUpdatedAt->diff($now, true);
+                    if ($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)) {
+                        $now = new \DateTime('NOW');
+                        $now = $now->getTimestamp();
+                        $quoteUpdatedAt = new \DateTime($quote->getUpdatedAt());
+                        $quoteUpdatedAt = $quoteUpdatedAt->getTimestamp();
 
-                    if ($now - $quoteUpdatedAt > 300) {
-                        $body = [];
-                        $body['notice'] = sprintf("Quote %s is still active in Magento, order could not be created from the Mondido webhook.", $quote->getId());
+                        if ($now - $quoteUpdatedAt > 300) {
+                            $body = [];
+                            $body['notice'] = sprintf("Quote %s is still active in Magento and the order could not be created from the Mondido webhook. Try setting is_active to 0 for the quote in the Magento database, login to Mondido and force the webhook for transaction %s anew.", $quote->getId(), $data['id']);
 
-                        $transport = $this->_transportBuilder
-                            ->setTemplateIdentifier('mondido_payment_webhook_notice')
-                            ->setTemplateOptions(
-                                [
-                                    'area' => \Magento\Framework\App\Area::AREA_FRONTEND, 
-                                    'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
-                                ]
-                            )
-                            ->setTemplateVars(['data' => $body])
-                            ->setFrom($this->scopeConfig->getValue('trans_email/ident_support/general', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
-                            ->addTo($this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
-                            ->getTransport();
+                            $emailData = new \Magento\Framework\DataObject();
+                            $emailData->setData($body);
 
-                        $transport->sendMessage();
+                            $transport = $this->transportBuilder
+                                ->setTemplateIdentifier('mondido_payment_webhook_notice')
+                                ->setTemplateOptions(
+                                    [
+                                        'area' => \Magento\Framework\App\Area::AREA_FRONTEND,
+                                        'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
+                                    ]
+                                )
+                                ->setTemplateVars(['data' => $emailData])
+                                ->setFrom([
+                                    'email' => $this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE),
+                                    'name' => $this->scopeConfig->getValue('trans_email/ident_support/name', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)
+                                ])
+                                ->addTo($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                                ->getTransport();
+
+                            $transport->sendMessage();
+                        }
                     }
 
                 } else if ($data['amount'] !== $this->helper->formatNumber($quote->getBaseGrandTotal())) {
                     $order = false;
                     $result['error'] = 'Wrong amount';
                     $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_BAD_REQUEST);
+
+                    if ($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)) {
+                        $body = [];
+                        $body['notice'] = sprintf("Quote %s has different amount than the transaction %s from Mondido. The order could not be created for that reason. Quote amount: %s. Transaction amount: %s.", $quote->getId(), $data['id'], $this->helper->formatNumber($quote->getBaseGrandTotal()), $data['amount']);
+
+                        $emailData = new \Magento\Framework\DataObject();
+                        $emailData->setData($body);
+
+                        $transport = $this->transportBuilder
+                            ->setTemplateIdentifier('mondido_payment_webhook_notice')
+                            ->setTemplateOptions(
+                                [
+                                    'area' => \Magento\Framework\App\Area::AREA_FRONTEND,
+                                    'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
+                                ]
+                            )
+                            ->setTemplateVars(['data' => $emailData])
+                            ->setFrom([
+                                'email' => $this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE),
+                                'name' => $this->scopeConfig->getValue('trans_email/ident_support/name', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)
+                            ])
+                            ->addTo($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                            ->getTransport();
+
+                        $transport->sendMessage();
+                    }
                 } else {
                     try {
                         $transactionJson = $this->transaction->show($data['id']);
@@ -259,24 +295,32 @@ class Index extends \Magento\Framework\App\Action\Action
                         $result['error'] = $e->getMessage();
                         $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_BAD_REQUEST);
 
-                        $body = [];
-                        $body['notice'] = sprintf("Quote %s could not be converted to an order: %s. Please make sure the Mondido transaction %s contains valid order information.", $quoteId, $e->getMessage(), $data['id']);
+                        if ($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)) {
 
-                        $transport = $this->_transportBuilder
-                            ->setTemplateIdentifier('mondido_payment_webhook_notice')
-                            ->setTemplateOptions(
-                                [
-                                    'area' => \Magento\Framework\App\Area::AREA_FRONTEND, 
-                                    'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
-                                ]
-                            )
-                            ->setTemplateVars(['data' => $body])
-                            ->setFrom($this->scopeConfig->getValue('trans_email/ident_support/general', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
-                            ->addTo($this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
-                            ->getTransport();
+                            $body = [];
+                            $body['notice'] = sprintf("Quote %s could not be converted to an order. Error message from Magento:\n\n%s\n\nPlease make sure the Mondido transaction %s contains valid order information.", $quoteId, $e->getMessage(), $data['id']);
 
-                        $transport->sendMessage();
+                            $emailData = new \Magento\Framework\DataObject();
+                            $emailData->setData($body);
 
+                            $transport = $this->transportBuilder
+                                ->setTemplateIdentifier('mondido_payment_webhook_notice')
+                                ->setTemplateOptions(
+                                    [
+                                        'area' => \Magento\Framework\App\Area::AREA_FRONTEND,
+                                        'store' => \Magento\Store\Model\Store::DEFAULT_STORE_ID,
+                                    ]
+                                )
+                                ->setTemplateVars(['data' => $emailData])
+                                ->setFrom([
+                                    'email' => $this->scopeConfig->getValue('trans_email/ident_support/email', \Magento\Store\Model\ScopeInterface::SCOPE_STORE),
+                                    'name' => $this->scopeConfig->getValue('trans_email/ident_support/name', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)
+                                ])
+                                ->addTo($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE))
+                                ->getTransport();
+
+                            $transport->sendMessage();
+                        }
                     }
                 }
             }
