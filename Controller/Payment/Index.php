@@ -89,6 +89,16 @@ class Index extends \Magento\Framework\App\Action\Action
     protected $subscriber;
 
     /**
+     * @var \Magento\Framework\Mail\Template\TransportBuilder
+     */
+    protected $transportBuilder;
+
+    /**
+     * @var \Magento\Framework\App\Config\ScopeConfigInterface
+     */
+    protected $scopeConfig;
+
+    /**
      * Constructor
      *
      * @param \Magento\Framework\App\Action\Context               $context           Context object
@@ -102,8 +112,8 @@ class Index extends \Magento\Framework\App\Action\Action
      * @param \Magento\Sales\Model\Order                          $order             Order model
      * @param \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender       Order sender
      * @param \Magento\Newsletter\Model\Subscriber                $subscriber        Subscriber model
-     * @param \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender       Order sender
      * @param \Magento\Framework\Mail\Template\TransportBuilder   $transportBuilder  Transport builder
+     * @param \Magento\Framework\App\Config\ScopeConfigInterface  $scopeConfig       Scope config
      *
      * @return void
      */
@@ -203,7 +213,6 @@ class Index extends \Magento\Framework\App\Action\Action
                             $transport->sendMessage();
                         }
                     }
-
                 } else if ($data['amount'] !== $this->helper->formatNumber($quote->getBaseGrandTotal())) {
                     $order = false;
                     $result['error'] = 'Wrong amount';
@@ -296,7 +305,6 @@ class Index extends \Magento\Framework\App\Action\Action
                         $resultJson->setHttpResponseCode(\Magento\Framework\Webapi\Exception::HTTP_BAD_REQUEST);
 
                         if ($this->scopeConfig->getValue('payment/mondido/email_webhook_failures_to', \Magento\Store\Model\ScopeInterface::SCOPE_STORE)) {
-
                             $body = [];
                             $body['notice'] = sprintf("Quote %s could not be converted to an order. Error message from Magento:\n\n%s\n\nPlease make sure the Mondido transaction %s contains valid order information.", $quoteId, $e->getMessage(), $data['id']);
 
