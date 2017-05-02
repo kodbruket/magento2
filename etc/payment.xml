@@ -12,7 +12,8 @@
         </method>
         <method name="mondido_paymentlink">
             <allow_multiple_address>0</allow_multiple_address>
+            <order_status>pending_payment</order_status>
+            <payment_action>authorize</payment_action>
         </method>
     </methods>
 </payment>
-

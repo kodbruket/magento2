@@ -79,8 +79,8 @@ class Paymentlink extends AbstractMethod implements MethodInterface
         $order = $payment->getOrder();
 
         // Build the result
-        $result = $mondidoTransaction->create($payment->getOrder()->getQuoteId());
-        $result = json_decode($result);
+        $originalResult = $mondidoTransaction->create($payment->getOrder()->getQuoteId(), 'paymentlink', 'mondido/paymentlink');
+        $result = json_decode($originalResult);
 
         if (property_exists($result, 'code') && $result->code != 200) {
             $message = sprintf(
@@ -96,6 +96,13 @@ class Paymentlink extends AbstractMethod implements MethodInterface
         $payment->setAdditionalInformation('id', $result->id);
         $payment->setAdditionalInformation('href', $result->href);
         $payment->setAdditionalInformation('status', $result->status);
+
+        $order = $payment->getOrder();
+        $order
+            ->setMondidoTransaction($originalResult)
+            ->setStatus('pending')
+            ->setState(\Magento\Sales\Model\Order::STATE_NEW)
+            ->save();
 
         return $this;
     }
@@ -123,13 +130,41 @@ class Paymentlink extends AbstractMethod implements MethodInterface
      */
     public function capture(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
-        die('xxx capture');
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $this->transaction = $objectManager->get('Mondido\Mondido\Model\Api\Transaction');
+
+        $order = $payment->getOrder();
+        $result = $this->transaction->capture($order, $amount);
+        $result = json_decode($result);
+
+        if (property_exists($result, 'code') && $result->code != 200) {
+            $message = sprintf(
+                __("Mondido returned error code %d: %s (%s)"),
+                $result->code,
+                $result->description,
+                $result->name
+            );
+
+            throw new \Magento\Framework\Exception\LocalizedException(__($message));
+        }
+
+        $payment->setTransactionId($result->id)->setIsTransactionClosed(false);
+        $payment->setAdditionalInformation('id', $result->id);
+        $payment->setAdditionalInformation('href', $result->href);
+        $payment->setAdditionalInformation('status', $result->status);
+
+        return true;
     }
 
+    /**
+     * Check if method is available
+     *
+     * @param \Magento\Quote\Api\Data\CartInterface|null $quote
+     *
+     * @return bool
+     */
     public function isAvailable(\Magento\Quote\Api\Data\CartInterface $quote = null)
     {
-        return true;
-
         return parent::isAvailable($quote);
     }
 }

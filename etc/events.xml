@@ -12,4 +12,7 @@
     <event name="sales_order_creditmemo_save_after">
         <observer name="mondido_add_creditmemo_to_metadata" instance="Mondido\Mondido\Observer\SalesOrderCreditmemoSaveAfterObserver" />
     </event>
+    <event name="sales_order_payment_place_end">
+        <observer name="mondido_paymentlink_auth" instance="Mondido\Mondido\Observer\SalesOrderPaymentPlaceEnd" />
+    </event>
 </config>

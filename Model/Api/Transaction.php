@@ -93,13 +93,13 @@ class Transaction extends Mondido
     protected function _createHash(\Magento\Quote\Model\Quote $quote)
     {
         $hashRecipe = [
-            'merchant_id' => $this->_config->getMerchantId(),
-            'payment_ref' => $quote->getId(),
+            'merchant_id'  => $this->_config->getMerchantId(),
+            'payment_ref'  => $quote->getId(),
             'customer_ref' => $quote->getCustomerId() ? $quote->getCustomerId() : '',
-            'amount' => $this->helper->formatNumber($quote->getBaseGrandTotal()),
-            'currency' => strtolower($quote->getBaseCurrencyCode()),
-            'test' => $this->_config->isTest() ? 'test' : '',
-            'secret' => $this->_config->getSecret()
+            'amount'       => $this->helper->formatNumber($quote->getBaseGrandTotal()),
+            'currency'     => strtolower($quote->getBaseCurrencyCode()),
+            'test'         => $this->_config->isTest() ? 'test' : '',
+            'secret'       => $this->_config->getSecret()
         ];
 
         $hash = md5(implode($hashRecipe));
@@ -114,17 +114,28 @@ class Transaction extends Mondido
      *
      * @return string
      */
-    public function create($quote)
+    public function create($quote, $paymentMethodCode = '', $webbHookPath = 'mondido/payment')
     {
         if (!is_object($quote)) {
-            $quote = $this->quoteRepository->getActive($quote);
+            $quote = $this->quoteRepository->get($quote);
         }
 
+        // Activate the quote if it's not active
+        if ($quote->getIsActive() == '0') {
+            $quote
+                ->setIsActive('1')
+                ->save();
+            $disableQuote = true;
+        }
+
+        $storeId = $this->_storeManager->getWebsite()->getId();
+
         $method = 'POST';
+        $noSid = ['_nosid' => 1];
 
         $webhook = [
-            'url' => $this->_storeManager->getStore()->getUrl('mondido/payment'),
-            'trigger' => 'payment',
+            'url'         => $this->_storeManager->getStore($storeId)->getUrl($webbHookPath, $noSid),
+            'trigger'     => 'payment',
             'http_method' => 'post',
             'data_format' => 'form_data'
         ];
@@ -133,26 +144,52 @@ class Transaction extends Mondido
         $transactionItems = $this->getItems($quote);
         $shippingAddress = $quote->getShippingAddress('shipping');
 
+        // Normal payment
+        if (!$paymentMethodCode) {
+            $successUrl = $this->_storeManager->getStore($storeId)->getUrl('mondido/checkout/redirect', $noSid);
+            $errorUrl = $this->_storeManager->getStore($storeId)->getUrl('mondido/checkout/error', $noSid);
+        }
+
+        // Links for payment link
+        if ($paymentMethodCode == 'paymentlink') {
+            $successUrl = $this->_storeManager->getStore($storeId)->getUrl('mondido/paymentlink/redirect', $noSid);
+            $errorUrl = $this->_storeManager->getStore($storeId)->getUrl('mondido/paymentlink/error', $noSid);
+        }
+
+        $successUrl = str_replace('local.mondido.se', 'pzggjkuioa.codepeak.co', $successUrl);
+        $errorUrl = str_replace('local.mondido.se', 'pzggjkuioa.codepeak.co', $errorUrl);
+
         $data = [
-            'merchant_id' => $this->_config->getMerchantId(),
-            'amount' => $this->helper->formatNumber($quote->getBaseGrandTotal()),
-            'vat_amount' => $this->helper->formatNumber($shippingAddress->getBaseTaxAmount()),
-            'payment_ref' => $quote->getId(),
-            'test' => $this->_config->isTest() ? 'true' : 'false',
-            'metadata' => $metaData,
-            'currency' => strtolower($quote->getBaseCurrencyCode()),
-            'hash' => $this->_createHash($quote),
-            'process' => 'false',
-            'success_url' => $this->urlBuilder->getUrl('mondido/checkout/redirect'),
-            'error_url' => $this->urlBuilder->getUrl('mondido/checkout/error'),
-            'authorize' => 'true',
-            'items' => json_encode($transactionItems),
-            'webhook' => json_encode($webhook),
+            'merchant_id'     => $this->_config->getMerchantId(),
+            'amount'          => $this->helper->formatNumber($quote->getBaseGrandTotal()),
+            'vat_amount'      => $this->helper->formatNumber($shippingAddress->getBaseTaxAmount()),
+            'payment_ref'     => $quote->getId(),
+            'test'            => $this->_config->isTest() ? 'true' : 'false',
+            'metadata'        => $metaData,
+            'currency'        => strtolower($quote->getBaseCurrencyCode()),
+            'hash'            => $this->_createHash($quote),
+            'process'         => 'false',
+            'success_url'     => $successUrl,
+            'error_url'       => $errorUrl,
+            'authorize'       => 'true',
+            'items'           => json_encode($transactionItems),
+            'webhook'         => json_encode($webhook),
             'payment_details' => $metaData['user']
         ];
 
         if ($quote->getCustomerId()) {
             $data['customer_ref'] = $quote->getCustomerId();
+        }
+
+        // Add additional data if link payment
+        if ($paymentMethodCode == 'paymentlink') {
+            $data['link_payment'] = 1;
+        }
+
+        if (isset($disableQuote) && $disableQuote) {
+            $quote
+                ->setIsActive(0)
+                ->save();
         }
 
         return $this->call($method, $this->resource, null, $data);
@@ -168,7 +205,7 @@ class Transaction extends Mondido
     public function update($quote)
     {
         if (!is_object($quote)) {
-            $quote = $this->quoteRepository->getActive($quote);
+            $quote = $this->quoteRepository->get($quote);
         }
 
         $transaction = json_decode($quote->getMondidoTransaction());
@@ -186,13 +223,13 @@ class Transaction extends Mondido
         $shippingAddress = $quote->getShippingAddress('shipping');
 
         $data = [
-            'amount' => $this->helper->formatNumber($quote->getBaseGrandTotal()),
+            'amount'     => $this->helper->formatNumber($quote->getBaseGrandTotal()),
             'vat_amount' => $this->helper->formatNumber($shippingAddress->getBaseTaxAmount()),
-            'metadata' => $metaData,
-            'currency' => strtolower($quote->getBaseCurrencyCode()),
-            'hash' => $this->_createHash($quote),
-            'items' => json_encode($transactionItems),
-            'process' => 'false'
+            'metadata'   => $metaData,
+            'currency'   => strtolower($quote->getBaseCurrencyCode()),
+            'hash'       => $this->_createHash($quote),
+            'items'      => json_encode($transactionItems),
+            'process'    => 'false'
         ];
 
         if ($quote->getCustomerId()) {
@@ -219,7 +256,7 @@ class Transaction extends Mondido
 
         $transaction = json_decode($quote->getMondidoTransaction());
 
-        if (property_exists($transaction, 'id')) {
+        if (is_object($transaction) && property_exists($transaction, 'id')) {
             $id = $transaction->id;
         } else {
             return false;
@@ -301,8 +338,8 @@ class Transaction extends Mondido
         }
 
         $data = [
-            'amount' => $this->helper->formatNumber($amount),
-            'reason' => 'Refund from Magento',
+            'amount'         => $this->helper->formatNumber($amount),
+            'reason'         => 'Refund from Magento',
             'transaction_id' => $id
         ];
 
@@ -338,12 +375,14 @@ class Transaction extends Mondido
 
         foreach ($quoteItems as $item) {
             $transactionItems[] = [
-                'artno' => $item->getSku(),
+                'artno'       => $item->getSku(),
                 'description' => $item->getName(),
-                'qty' => $item->getQty(),
-                'amount' => $this->helper->formatNumber($item->getBaseRowTotalInclTax() - $item->getBaseDiscountAmount()),
-                'vat' => $this->helper->formatNumber($item->getTaxPercent()),
-                'discount' => $this->helper->formatNumber($item->getBaseDiscountAmount())
+                'qty'         => $item->getQty(),
+                'amount'      => $this->helper->formatNumber(
+                    $item->getBaseRowTotalInclTax() - $item->getBaseDiscountAmount()
+                ),
+                'vat'         => $this->helper->formatNumber($item->getTaxPercent()),
+                'discount'    => $this->helper->formatNumber($item->getBaseDiscountAmount())
             ];
         }
 
@@ -352,18 +391,19 @@ class Transaction extends Mondido
             $baseShippingAmount = $shippingAddress->getBaseShippingAmount();
 
             if ($baseShippingAmount > 0) {
-                $shippingVat = $baseShippingAmount / ($baseShippingAmount - $shippingAddress->getBaseShippingTaxAmount());
+                $shippingVat = $baseShippingAmount / ($baseShippingAmount - $shippingAddress->getBaseShippingTaxAmount(
+                        ));
             } else {
                 $shippingVat = 0;
             }
 
             $transactionItems[] = [
-                'artno' => $shippingAddress->getShippingMethod(),
+                'artno'       => $shippingAddress->getShippingMethod(),
                 'description' => $shippingAddress->getShippingDescription(),
-                'qty' => 1,
-                'amount' => $this->helper->formatNumber($baseShippingAmount),
-                'vat' => $this->helper->formatNumber($shippingVat),
-                'discount' => $this->helper->formatNumber($shippingAddress->getBaseShippingDiscountAmount())
+                'qty'         => 1,
+                'amount'      => $this->helper->formatNumber($baseShippingAmount),
+                'vat'         => $this->helper->formatNumber($shippingVat),
+                'discount'    => $this->helper->formatNumber($shippingAddress->getBaseShippingDiscountAmount())
             ];
         }
 
@@ -387,28 +427,28 @@ class Transaction extends Mondido
 
         foreach ($shippingMethods as $shippingMethod) {
             $shippingData[] = [
-                'carrier_code' => $shippingMethod->getCarrierCode(),
-                'method_code' => $shippingMethod->getMethodCode(),
-                'carrier_title' => $shippingMethod->getCarrierTitle(),
-                'method_title' => $shippingMethod->getMethodTitle(),
-                'amount' => $shippingMethod->getAmount(),
-                'base_amount' => $shippingMethod->getBaseAmount(),
-                'available' => $shippingMethod->getAvailable(),
-                'error_message' => $shippingMethod->getErrorMessage(),
-                'price_excl_tax' => $shippingMethod->getPriceExclTax(),
+                'carrier_code'    => $shippingMethod->getCarrierCode(),
+                'method_code'     => $shippingMethod->getMethodCode(),
+                'carrier_title'   => $shippingMethod->getCarrierTitle(),
+                'method_title'    => $shippingMethod->getMethodTitle(),
+                'amount'          => $shippingMethod->getAmount(),
+                'base_amount'     => $shippingMethod->getBaseAmount(),
+                'available'       => $shippingMethod->getAvailable(),
+                'error_message'   => $shippingMethod->getErrorMessage(),
+                'price_excl_tax'  => $shippingMethod->getPriceExclTax(),
                 'getPriceInclTax' => $shippingMethod->getPriceInclTax()
             ];
         }
 
         $paymentDetails = [
-            'email' => $shippingAddress->getEmail(),
-            'phone' => $shippingAddress->getTelephone(),
-            'first_name' => $shippingAddress->getFirstname(),
-            'last_name' => $shippingAddress->getLastname(),
-            'zip' => $shippingAddress->getPostcode(),
-            'address_1' => $shippingAddress->getStreetLine(1),
-            'address_2' => $shippingAddress->getStreetLine(2),
-            'city' => $shippingAddress->getCity(),
+            'email'        => $shippingAddress->getEmail(),
+            'phone'        => $shippingAddress->getTelephone(),
+            'first_name'   => $shippingAddress->getFirstname(),
+            'last_name'    => $shippingAddress->getLastname(),
+            'zip'          => $shippingAddress->getPostcode(),
+            'address_1'    => $shippingAddress->getStreetLine(1),
+            'address_2'    => $shippingAddress->getStreetLine(2),
+            'city'         => $shippingAddress->getCity(),
             'country_code' => $this->isoHelper->transform($shippingAddress->getCountryId())
         ];
 
@@ -416,23 +456,23 @@ class Transaction extends Mondido
         $defaultCountry = $this->_config->getDefaultCountry();
 
         $data = [
-            'user' => $paymentDetails,
+            'user'     => $paymentDetails,
             'products' => $this->getItems($quote),
-            'magento' => [
-                'edition' => $this->_config->getMagentoEdition(),
-                'version' => $this->_config->getMagentoVersion(),
-                'php' => phpversion(),
-                'module' => $this->_config->getModuleInformation(),
-                'configuration' => [
+            'magento'  => [
+                'edition'          => $this->_config->getMagentoEdition(),
+                'version'          => $this->_config->getMagentoVersion(),
+                'php'              => phpversion(),
+                'module'           => $this->_config->getModuleInformation(),
+                'configuration'    => [
                     'general' => [
                         'country' => [
-                            'allow' => $allowedCountries,
+                            'allow'   => $allowedCountries,
                             'default' => $defaultCountry
                         ]
                     ]
                 ],
                 'shipping_methods' => $shippingData,
-                'quote' => [
+                'quote'            => [
                     'entity_id' => $quote->getId()
                 ]
             ]

@@ -13,6 +13,10 @@
 
 namespace Mondido\Mondido\Controller\Paymentlink;
 
+use Magento\Customer\Api\AccountManagementInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Mondido\Mondido\Model\Api\Transaction;
+
 /**
  * Redirect action
  *
@@ -24,6 +28,40 @@ namespace Mondido\Mondido\Controller\Paymentlink;
  */
 class Redirect extends \Magento\Checkout\Controller\Onepage
 {
+    public function __construct(
+        \Magento\Framework\App\Action\Context $context,
+        \Magento\Customer\Model\Session $customerSession,
+        CustomerRepositoryInterface $customerRepository,
+        AccountManagementInterface $accountManagement,
+        \Magento\Framework\Registry $coreRegistry,
+        \Magento\Framework\Translate\InlineInterface $translateInline,
+        \Magento\Framework\Data\Form\FormKey\Validator $formKeyValidator,
+        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\View\LayoutFactory $layoutFactory,
+        \Magento\Quote\Api\CartRepositoryInterface $quoteRepository,
+        \Magento\Framework\View\Result\PageFactory $resultPageFactory,
+        \Magento\Framework\View\Result\LayoutFactory $resultLayoutFactory,
+        \Magento\Framework\Controller\Result\RawFactory $resultRawFactory,
+        \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory
+    ) {
+        parent::__construct(
+            $context,
+            $customerSession,
+            $customerRepository,
+            $accountManagement,
+            $coreRegistry,
+            $translateInline,
+            $formKeyValidator,
+            $scopeConfig,
+            $layoutFactory,
+            $quoteRepository,
+            $resultPageFactory,
+            $resultLayoutFactory,
+            $resultRawFactory,
+            $resultJsonFactory
+        );
+    }
+
     /**
      * Execute
      *
@@ -31,23 +69,6 @@ class Redirect extends \Magento\Checkout\Controller\Onepage
      */
     public function execute()
     {
-        die('redirect');
-        // Get session
-        $session = $this->getOnepage()->getCheckout();
-
-        // Get quote
-        $quote = $this->getOnepage()->getQuote();
-        $quote->reserveOrderId()->setIsActive(0)->save();
-
-        $reservedOrderId = $quote->getReservedOrderId();
-        $quoteId = $quote->getId();
-
-        $session->setLastQuoteId($quoteId)
-            ->setLastSuccessQuoteId($quoteId)
-            ->clearHelperData();
-
-        $session->setLastRealOrderId($reservedOrderId);
-
         $resultPage = $this->resultPageFactory->create();
 
         return $resultPage;

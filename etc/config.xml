@@ -19,7 +19,7 @@
                 <active>0</active>
                 <model>Mondido\Mondido\Model\Paymentlink</model>
                 <payment_action>authorize</payment_action>
-                <order_status>pending</order_status>
+                <order_status>pending_payment</order_status>
                 <title>Mondido Payment Link</title>
                 <allowspecific>0</allowspecific>
             </mondido_paymentlink>

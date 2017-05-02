@@ -52,16 +52,6 @@ class Paymentlink extends Info
         $url = $this->getInfo()->getAdditionalInformation('href');
 
         return $url;
-
-#        return var_export, true);
-
-        $transaction = $this->transaction->show($info->getAdditionalInformation('id'));
-
-        return ($transaction);
-        echo '<pre>';
-        print_r($transaction);
-
-        return 'x0x0x0x0';
     }
 
     /**
@@ -77,16 +67,12 @@ class Paymentlink extends Info
             return $this->_paymentSpecificInformation;
         }
 
-        die('xxx');
-
         $info = $this->getInfo();
         $transport = new \Magento\Framework\DataObject();
 
         $transaction = $this->transaction->show($info->getAdditionalInformation('id'));
 
         $data = json_decode($transaction, true);
-
-        print_r($data);
 
         $transport->setData('ID', $data['id']);
         $transport->setData('Reference', $data['payment_ref']);
@@ -104,10 +90,5 @@ class Paymentlink extends Info
         $transport = parent::_prepareSpecificInformation($transport);
 
         return $transport;
-    }
-
-    public function getPaymentUrl()
-    {
-
     }
 }
