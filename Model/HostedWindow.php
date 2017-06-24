@@ -125,23 +125,32 @@ class HostedWindow extends \Magento\Payment\Model\Method\AbstractMethod
         $this->transaction = $objectManager->get('Mondido\Mondido\Model\Api\Transaction');
 
         $order = $payment->getOrder();
-        $result = $this->transaction->capture($order, $amount);
-        $result = json_decode($result);
 
-        if (is_object($result) && property_exists($result, 'code')) {
-            $message = sprintf(
-                __("Mondido returned error code %d: %s (%s)"),
-                $result->code,
-                $result->description,
-                $result->name
-            );
-            throw new \Magento\Framework\Exception\LocalizedException(__($message));
+        // Only capture order that's above 0 in total amount
+        if ($order->getGrandTotal() > 0) {
+            $result = $this->transaction->capture($order, $amount);
+            $result = json_decode($result);
+
+            if (is_object($result) && property_exists($result, 'code')) {
+                $message = sprintf(
+                    __("Mondido returned error code %d: %s (%s)"),
+                    $result->code,
+                    $result->description,
+                    $result->name
+                );
+                throw new \Magento\Framework\Exception\LocalizedException(__($message));
+            }
+
+            if (!is_object($result) || (is_object($result) && !property_exists($result, 'id'))) {
+                throw new \Magento\Framework\Exception\LocalizedException(__('Could not capture order online'));
+            }
+        } else {
+            // Setup dummy values
+            $result = new \stdClass();
+            $result->id = '0-' . time();
+            $result->href = '#';
+            $result->status = '';
         }
-
-        if (!is_object($result) || (is_object($result) && !property_exists($result, 'id'))) {
-            throw new \Magento\Framework\Exception\LocalizedException(__('Could not capture order online'));
-        }
-
         $payment->setTransactionId($result->id)->setIsTransactionClosed(false);
         $payment->setAdditionalInformation('id', $result->id);
         $payment->setAdditionalInformation('href', $result->href);
@@ -175,7 +184,7 @@ class HostedWindow extends \Magento\Payment\Model\Method\AbstractMethod
 
         $canRefundMore = $payment->getCreditmemo()->getInvoice()->canRefund();
         $isFullRefund = !$canRefundMore &&
-                0 == (double)$order->getBaseTotalOnlineRefunded() + (double)$order->getBaseTotalOfflineRefunded();
+            0 == (double) $order->getBaseTotalOnlineRefunded() + (double) $order->getBaseTotalOfflineRefunded();
 
         $result = $this->transaction->refund($order, $amount);
         $result = json_decode($result);
