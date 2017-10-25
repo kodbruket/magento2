@@ -7,7 +7,11 @@
         {
             "type": "composer",
             "url": "https://repo.magento.com/"
-        }
+        },
+        {  
+            "type": "vcs",  
+            "url": "https://github.com/kodbruket/magento2-mondido"  
+        } 
     ],
     "authors": [
         {
