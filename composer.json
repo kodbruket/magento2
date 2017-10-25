@@ -1,5 +1,5 @@
 {
-    "name": "kodbruket/magento2-mondido",
+    "name": "mondido/magento2-mondido",
     "description": "Mondido payment module for Magento 2.",
     "version": "1.3.11",
     "type": "magento2-module",
